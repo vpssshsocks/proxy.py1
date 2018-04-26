@@ -1,0 +1,135 @@
+#!/usr/bin/env python
+
+import sys
+import httplib
+from SocketServer import ThreadingMixIn
+from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+from threading import Lock, Timer
+from cStringIO import StringIO
+from urlparse import urlsplit
+import socket
+import select
+import gzip
+import zlib
+import re
+import traceback
+
+
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+
+    address_family = socket.AF_INET
+
+    def handle_error(self, request, client_address):
+        
+        print >>sys.stderr, '-'*40
+        print >>sys.stderr, 'Exception happened during processing of request from', client_address
+        traceback.print_exc()
+        print >>sys.stderr, '-'*40
+        
+     
+class ThreadingHTTPServer6(ThreadingHTTPServer):
+
+    address_family = socket.AF_INET6
+
+
+class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
+    global_lock = Lock()
+    conn_table = {}
+    timeout = 300               
+    upstream_timeout = 300    
+    proxy_via = None          
+
+    def log_error(self, format, *args):
+        if format == "Request timed out: %r":
+            return
+        self.log_message(format, *args)
+ 
+    def do_CONNECT(self):
+        
+
+        req = self
+        reqbody = None
+        req.path = "https://%s/" % req.path.replace(':443', '')
+
+        replaced_reqbody = self.request_handler(req, reqbody)
+        if replaced_reqbody is True:
+            return
+
+        u = urlsplit(req.path)
+        address = (u.hostname, u.port or 443)
+        try:
+            conn = socket.create_connection(address)
+        except socket.error:
+            return
+        self.send_response(200, '<font color="red">PROXY SOCKS</font> <font color="blue">#Bolsonaro2018</font>')
+        self.send_header('Connection', 'close')
+        self.end_headers()
+
+        conns = [self.connection, conn]
+        keep_connection = True
+        while keep_connection:
+            keep_connection = False
+            rlist, wlist, xlist = select.select(conns, [], conns, self.timeout)
+            if xlist:
+                break
+            for r in rlist:
+                other = conns[1] if r is conns[0] else conns[0]
+                data = r.recv(8192)
+                if data:
+                    other.sendall(data)
+                    keep_connection = True
+                    
+    def do_GET(self):
+               
+               req = self
+        reqbody = None
+        req.path = "https://%s/" % req.path.replace(':443', '')
+
+        replaced_reqbody = self.request_handler(req, reqbody)
+        if replaced_reqbody is True:
+            return
+
+        u = urlsplit(req.path)
+        address = (u.hostname, u.port or 443)
+        try:
+            conn = socket.create_connection(address)
+        except socket.error:
+            return
+        self.send_response(200, '<font color="red">PROXY SOCKS</font> <font color="blue">#Bolsonaro2018</font>')
+        self.send_header('Connection', 'close')
+        self.end_headers()
+
+        conns = [self.connection, conn]
+        keep_connection = True
+        while keep_connection:
+            keep_connection = False
+            rlist, wlist, xlist = select.select(conns, [], conns, self.timeout)
+            if xlist:
+                break
+            for r in rlist:
+                other = conns[1] if r is conns[0] else conns[0]
+                data = r.recv(8192)
+                if data:
+                    other.sendall(data)
+                    keep_connection = True
+               
+           
+ 
+    def test(HandlerClass=SimpleHTTPProxyHandler, ServerClass=ThreadingHTTPServer, protocol="HTTP/1.1"):
+    if sys.argv[1:]:
+        port = int(sys.argv[1])
+    else:
+        port = 80
+    server_address = ('', port)
+
+    HandlerClass.protocol_version = protocol
+    httpd = ServerClass(server_address, HandlerClass)
+
+    sa = httpd.socket.getsockname()
+    print "Serving HTTP on", sa[0], "port", sa[1], "..."
+    httpd.serve_forever()
+
+
+if __name__ == '__main__':
+    test()                
+                    
